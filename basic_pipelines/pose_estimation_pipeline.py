@@ -37,10 +37,9 @@ class GStreamerPoseEstimationApp(GStreamerApp):
         # Additional initialization code can be added here
         # Set Hailo parameters these parameters should be set based on the model used
         self.batch_size = 2
-        self.network_width = 640
-        self.network_height = 640
-        self.network_format = "RGB"
-
+        self.video_width = 1280
+        self.video_height = 720
+        self.video_format = "RGB"
 
         # Determine the architecture if not specified
         if args.arch is None:
@@ -75,7 +74,7 @@ class GStreamerPoseEstimationApp(GStreamerApp):
         self.create_pipeline()
 
     def get_pipeline_string(self):
-        source_pipeline = SOURCE_PIPELINE(video_source=self.video_source)
+        source_pipeline = SOURCE_PIPELINE(video_source=self.video_source, video_width=self.video_width, video_height=self.video_height)
         infer_pipeline = INFERENCE_PIPELINE(
             hef_path=self.hef_path,
             post_process_so=self.post_process_so,

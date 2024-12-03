@@ -44,9 +44,9 @@ class GStreamerDetectionApp(GStreamerApp):
         # Additional initialization code can be added here
         # Set Hailo parameters these parameters should be set based on the model used
         self.batch_size = 2
-        self.network_width = 640
-        self.network_height = 640
-        self.network_format = "RGB"
+        # self.video_width = 640
+        # self.video_height = 640
+        # self.video_format = "RGB"
         nms_score_threshold = 0.3
         nms_iou_threshold = 0.45
 
@@ -90,13 +90,14 @@ class GStreamerDetectionApp(GStreamerApp):
         self.create_pipeline()
 
     def get_pipeline_string(self):
-        source_pipeline = SOURCE_PIPELINE(self.video_source)
+        source_pipeline = SOURCE_PIPELINE(self.video_source, self.video_width, self.video_height)
         detection_pipeline = INFERENCE_PIPELINE(
             hef_path=self.hef_path,
             post_process_so=self.post_process_so,
             batch_size=self.batch_size,
             config_json=self.labels_json,
             additional_params=self.thresholds_str)
+        detection_pipeline = INFERENCE_PIPELINE_WRAPPER(detection_pipeline)
         user_callback_pipeline = USER_CALLBACK_PIPELINE()
         display_pipeline = DISPLAY_PIPELINE(video_sink=self.video_sink, sync=self.sync, show_fps=self.show_fps)
         pipeline_string = (

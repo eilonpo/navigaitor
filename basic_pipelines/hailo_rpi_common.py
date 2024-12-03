@@ -10,6 +10,7 @@ import setproctitle
 import cv2
 import time
 import signal
+import threading
 import subprocess
 
 # Try to import hailo python module
@@ -17,6 +18,11 @@ try:
     import hailo
 except ImportError:
     sys.exit("Failed to import hailo python module. Make sure you are in hailo virtual environment.")
+
+try:
+    from picamera2 import Picamera2
+except ImportError:
+    pass # Available only on Pi OS
 
 # -----------------------------------------------------------------------------------------------
 # User-defined class to be used in the callback function
@@ -120,10 +126,11 @@ def get_default_parser():
     default_video_source = os.path.join(current_path, '../resources/detection0.mp4')
     parser.add_argument(
         "--input", "-i", type=str, default=default_video_source,
-        help="Input source. Can be a file, USB or RPi camera (CSI camera module). \
-        For RPi camera use '-i rpi' (Still in Beta). \
+        help="Input source. Can be a file, USB (webcam) or RPi camera (CSI camera module). \
+        For RPi camera use '-i rpi' \
         Defaults to example video resources/detection0.mp4"
     )
+    parser.add_argument("--no-webcam-compression", action="store_true", help="Disables compression for the webcam")
     parser.add_argument("--use-frame", "-u", action="store_true", help="Use frame from the callback function")
     parser.add_argument("--show-fps", "-f", action="store_true", help="Print FPS on sink")
     parser.add_argument(
@@ -153,11 +160,12 @@ def get_source_type(input_source):
     # return values can be "file", "mipi" or "usb"
     if input_source.startswith("/dev/video"):
         return 'usb'
+    elif input_source.startswith("rpi"):
+        return 'rpi'
+    elif input_source.startswith("libcamera"): # Use libcamerasrc element, not suggested
+        return 'libcamera'
     else:
-        if input_source.startswith("rpi"):
-            return 'rpi'
-        else:
-            return 'file'
+        return 'file'
 
 def QUEUE(name, max_size_buffers=3, max_size_bytes=0, max_size_time=0, leaky='no'):
     """
@@ -176,15 +184,15 @@ def QUEUE(name, max_size_buffers=3, max_size_bytes=0, max_size_time=0, leaky='no
     q_string = f'queue name={name} leaky={leaky} max-size-buffers={max_size_buffers} max-size-bytes={max_size_bytes} max-size-time={max_size_time} '
     return q_string
 
-def SOURCE_PIPELINE(video_source, video_format='RGB', video_width=640, video_height=640, name='source'):
+def SOURCE_PIPELINE(video_source, video_width=640, video_height=640, video_format='RGB', name='source', no_webcam_compression=False):
     """
     Creates a GStreamer pipeline string for the video source.
 
     Args:
         video_source (str): The path or device name of the video source.
-        video_format (str, optional): The video format. Defaults to 'RGB'.
         video_width (int, optional): The width of the video. Defaults to 640.
         video_height (int, optional): The height of the video. Defaults to 640.
+        video_format (str, optional): The video format. Defaults to 'RGB'.
         name (str, optional): The prefix name for the pipeline elements. Defaults to 'source'.
 
     Returns:
@@ -192,21 +200,35 @@ def SOURCE_PIPELINE(video_source, video_format='RGB', video_width=640, video_hei
     """
     source_type = get_source_type(video_source)
 
-    if source_type == 'rpi':
+    if source_type == 'usb':
+        if no_webcam_compression:
+            source_element = (
+                f'v4l2src device={video_source} name={name} ! '
+                'video/x-raw, format=RGB, width=640, height=480 ! '
+            )
+        else:
+            # Use compressed format for webcam
+            source_element = (
+                f'v4l2src device={video_source} name={name} ! image/jpeg, framerate=30/1 ! '
+                f'{QUEUE(name=f"{name}_queue_decode")} ! '
+                f'decodebin name={name}_decodebin ! '
+            )
+    elif source_type == 'rpi':
+        source_element = (
+            f'appsrc name=app_source is-live=true leaky-type=downstream max-buffers=3 ! '
+            'videoflip name=videoflip video-direction=horiz ! '
+            f'video/x-raw, format={video_format}, width={video_width}, height={video_height} ! '
+        )
+    elif source_type == 'libcamera':
         source_element = (
             f'libcamerasrc name={name} ! '
             f'video/x-raw, format={video_format}, width=1536, height=864 ! '
         )
-    elif source_type == 'usb':
-        source_element = (
-            f'v4l2src device={video_source} name={name} ! '
-            'video/x-raw, width=640, height=480 ! '
-        )
     else:
         source_element = (
             f'filesrc location="{video_source}" name={name} ! '
-            f'{QUEUE(name=f"{name}_queue_dec264")} ! '
-            'qtdemux ! h264parse ! avdec_h264 max-threads=2 ! '
+            f'{QUEUE(name=f"{name}_queue_decode")} ! '
+            f'decodebin name={name}_decodebin ! '
         )
     source_pipeline = (
         f'{source_element} '
@@ -214,8 +236,8 @@ def SOURCE_PIPELINE(video_source, video_format='RGB', video_width=640, video_hei
         f'videoscale name={name}_videoscale n-threads=2 ! '
         f'{QUEUE(name=f"{name}_convert_q")} ! '
         f'videoconvert n-threads=3 name={name}_convert qos=false ! '
-        f'video/x-raw, format={video_format}, pixel-aspect-ratio=1/1 ! '
-        # f'video/x-raw, format={video_format}, width={video_width}, height={video_height} ! '
+        # f'video/x-raw, format={video_format}, pixel-aspect-ratio=1/1 ! '
+        f'video/x-raw, pixel-aspect-ratio=1/1, format={video_format}, width={video_width}, height={video_height} ! '
     )
 
     return source_pipeline
@@ -365,12 +387,13 @@ class GStreamerApp:
         self.video_sink = "xvimagesink"
         self.pipeline = None
         self.loop = None
+        self.threads = []
 
         # Set Hailo parameters; these parameters should be set based on the model used
         self.batch_size = 1
-        self.network_width = 640
-        self.network_height = 640
-        self.network_format = "RGB"
+        self.video_width = 1280
+        self.video_height = 720
+        self.video_format = "RGB"
         self.hef_path = None
         self.app_callback = None
 
@@ -488,6 +511,11 @@ class GStreamerApp:
             display_process = multiprocessing.Process(target=display_user_data_frame, args=(self.user_data,))
             display_process.start()
 
+        if self.source_type == "rpi":
+            picam_thread = threading.Thread(target=self.picamera_thread)
+            self.threads.append(picam_thread)
+            picam_thread.start()
+
         # Set pipeline to PLAYING state
         self.pipeline.set_state(Gst.State.PLAYING)
 
@@ -504,6 +532,73 @@ class GStreamerApp:
         if self.options_menu.use_frame:
             display_process.terminate()
             display_process.join()
+        for t in self.threads:
+            t.join()
+
+    def picamera_thread(self, picamera_config=None):
+        appsrc = self.pipeline.get_by_name("app_source")
+        appsrc.set_property("is-live", True)
+        appsrc.set_property("format", Gst.Format.TIME)
+        print("appsrc properties: ", appsrc)
+
+        # Initialize Picamera2
+        with Picamera2() as picam2:
+            if picamera_config is None:
+                # Default configuration
+                main = {'size': (1280, 720), 'format': 'RGB888'}
+                lores = {'size': (self.video_width, self.video_height), 'format': 'RGB888'}
+
+                controls = {'FrameRate': 30}
+                config = picam2.create_preview_configuration(main=main, lores=lores, controls=controls)
+            else:
+                config = picamera_config
+            # Configure the camera with the created configuration
+            picam2.configure(config)
+
+            # Update GStreamer caps based on 'lores' stream
+            lores_stream = config['lores']
+            format_str = 'RGB' if lores_stream['format'] == 'RGB888' else self.video_format
+            width, height = lores_stream['size']
+            print(f"Picamera2 configuration: width={width}, height={height}, format={format_str}")
+            appsrc.set_property(
+                "caps",
+                Gst.Caps.from_string(
+                    f"video/x-raw, format={format_str}, width={width}, height={height}, "
+                    f"framerate=30/1, pixel-aspect-ratio=1/1"
+                )
+            )
+
+            picam2.start()
+
+            frame_count = 0
+            start_time = time.time()
+            print("picamera_process started")
+            while True:
+                frame_data = picam2.capture_array('lores')
+                # frame_data = np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)
+                if frame_data is None:
+                    print("Failed to capture frame.")
+                    break
+
+                # Convert framontigue data if necessary
+                frame = cv2.cvtColor(frame_data, cv2.COLOR_BGR2RGB)
+                frame = np.asarray(frame)
+
+                # Create Gst.Buffer by wrapping the frame data
+                buffer = Gst.Buffer.new_wrapped(frame.tobytes())
+
+                # Set buffer PTS and duration
+                buffer_duration = Gst.util_uint64_scale_int(1, Gst.SECOND, 30)
+                buffer.pts = frame_count * buffer_duration
+                buffer.duration = buffer_duration
+
+                # Push the buffer to appsrc
+                ret = appsrc.emit('push-buffer', buffer)
+                if ret != Gst.FlowReturn.OK:
+                    print("Failed to push buffer:", ret)
+                    break
+
+                frame_count += 1
 
 # ---------------------------------------------------------
 # Functions used to get numpy arrays from GStreamer buffers
