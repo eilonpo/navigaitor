@@ -97,12 +97,12 @@ class GStreamerDetectionApp(GStreamerApp):
             batch_size=self.batch_size,
             config_json=self.labels_json,
             additional_params=self.thresholds_str)
-        detection_pipeline = INFERENCE_PIPELINE_WRAPPER(detection_pipeline)
+        detection_pipeline_wrapper = INFERENCE_PIPELINE_WRAPPER(detection_pipeline)
         user_callback_pipeline = USER_CALLBACK_PIPELINE()
         display_pipeline = DISPLAY_PIPELINE(video_sink=self.video_sink, sync=self.sync, show_fps=self.show_fps)
         pipeline_string = (
             f'{source_pipeline} '
-            f'{detection_pipeline} ! '
+            f'{detection_pipeline_wrapper} ! '
             f'{user_callback_pipeline} ! '
             f'{display_pipeline}'
         )

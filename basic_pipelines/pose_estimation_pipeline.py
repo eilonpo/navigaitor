@@ -14,6 +14,7 @@ from hailo_rpi_common import (
     QUEUE,
     SOURCE_PIPELINE,
     INFERENCE_PIPELINE,
+    INFERENCE_PIPELINE_WRAPPER,
     USER_CALLBACK_PIPELINE,
     DISPLAY_PIPELINE,
     GStreamerApp,
@@ -39,7 +40,6 @@ class GStreamerPoseEstimationApp(GStreamerApp):
         self.batch_size = 2
         self.video_width = 1280
         self.video_height = 720
-        self.video_format = "RGB"
 
         # Determine the architecture if not specified
         if args.arch is None:
@@ -65,7 +65,7 @@ class GStreamerPoseEstimationApp(GStreamerApp):
 
         # Set the post-processing shared object file
         self.post_process_so = os.path.join(self.current_path, '../resources/libyolov8pose_postprocess.so')
-        self.post_process_function = "filter"
+        self.post_process_function = "filter_letterbox"
 
 
         # Set the process title
@@ -82,10 +82,11 @@ class GStreamerPoseEstimationApp(GStreamerApp):
             batch_size=self.batch_size
         )
         user_callback_pipeline = USER_CALLBACK_PIPELINE()
+        infer_pipeline_wrapper = INFERENCE_PIPELINE_WRAPPER(infer_pipeline)
         display_pipeline = DISPLAY_PIPELINE(video_sink=self.video_sink, sync=self.sync, show_fps=self.show_fps)
         pipeline_string = (
             f'{source_pipeline} '
-            f'{infer_pipeline} ! '
+            f'{infer_pipeline_wrapper} ! '
             f'{user_callback_pipeline} ! '
             f'{display_pipeline}'
         )

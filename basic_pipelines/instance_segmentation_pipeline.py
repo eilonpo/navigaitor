@@ -14,6 +14,7 @@ from hailo_rpi_common import (
     QUEUE,
     SOURCE_PIPELINE,
     INFERENCE_PIPELINE,
+    INFERENCE_PIPELINE_WRAPPER,
     USER_CALLBACK_PIPELINE,
     DISPLAY_PIPELINE,
     GStreamerApp,
@@ -37,8 +38,8 @@ class GStreamerInstanceSegmentationApp(GStreamerApp):
         # Additional initialization code can be added here
         # Set Hailo parameters these parameters should be set based on the model used
         self.batch_size = 2
-        self.video_width = 640
-        self.video_height = 640
+        self.video_width = 1280
+        self.video_height = 720
         # self.video_format = "RGB"
 
         # Determine the architecture if not specified
@@ -67,7 +68,7 @@ class GStreamerInstanceSegmentationApp(GStreamerApp):
         else:
             raise ValueError("HEF version not supported, you will need to provide a config file")
         self.default_post_process_so = os.path.join(self.current_path, '../resources/libyolov5seg_postprocess.so')
-        self.post_function_name = "yolov5seg"
+        self.post_function_name = "filter_letterbox"
         self.app_callback = app_callback
 
         # Set the process title
@@ -85,10 +86,11 @@ class GStreamerInstanceSegmentationApp(GStreamerApp):
             config_json=self.config_file,
         )
         user_callback_pipeline = USER_CALLBACK_PIPELINE()
+        infer_pipeline_wrapper = INFERENCE_PIPELINE_WRAPPER(infer_pipeline)
         display_pipeline = DISPLAY_PIPELINE(video_sink=self.video_sink, sync=self.sync, show_fps=self.show_fps)
         pipeline_string = (
             f'{source_pipeline} '
-            f'{infer_pipeline} ! '
+            f'{infer_pipeline_wrapper} ! '
             f'{user_callback_pipeline} ! '
             f'{display_pipeline}'
         )
