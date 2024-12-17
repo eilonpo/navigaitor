@@ -61,9 +61,9 @@ def app_callback(pad, info, user_data):
     format, width, height = get_caps_from_pad(pad)
     frame = np.zeros((height, width, 3), dtype=np.uint8)
 
-    # Reduce the resolution by a factor of 2
-    reduced_width = width // 2
-    reduced_height = height // 2
+    # Reduce the resolution by a factor of 4
+    reduced_width = width // 4
+    reduced_height = height // 4
     reduced_frame = cv2.resize(frame, (reduced_width, reduced_height), interpolation=cv2.INTER_LINEAR)
 
     # Get the detections from the buffer
