@@ -47,6 +47,10 @@ COLORS = [
 
 # This is the callback function that will be called when data is available from the pipeline
 def app_callback(pad, info, user_data):
+    # Using the user_data to count the number of frames
+    user_data.increment()
+    string_to_print = f"Frame count: {user_data.get_count()}\n"
+
     # Skip frames to reduce compute
     if user_data.get_count() % user_data.frame_skip != 0:
         return Gst.PadProbeReturn.OK
@@ -57,9 +61,6 @@ def app_callback(pad, info, user_data):
     if buffer is None:
         return Gst.PadProbeReturn.OK
 
-    # Using the user_data to count the number of frames
-    user_data.increment()
-    string_to_print = f"Frame count: {user_data.get_count()}\n"
 
     # Get the caps from the pad
     format, width, height = get_caps_from_pad(pad)
