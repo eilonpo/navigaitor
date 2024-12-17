@@ -14,9 +14,7 @@ from hailo_rpi_common import (
     QUEUE,
     SOURCE_PIPELINE,
     INFERENCE_PIPELINE,
-    INFERENCE_PIPELINE_WRAPPER,
     USER_CALLBACK_PIPELINE,
-    TRACKER_PIPELINE,
     DISPLAY_PIPELINE,
     GStreamerApp,
     app_callback_class,
@@ -39,9 +37,9 @@ class GStreamerInstanceSegmentationApp(GStreamerApp):
         # Additional initialization code can be added here
         # Set Hailo parameters these parameters should be set based on the model used
         self.batch_size = 2
-        self.video_width = 1280
-        self.video_height = 720
-        # self.video_format = "RGB"
+        self.network_width = 640
+        self.network_height = 640
+        self.network_format = "GRAY8"
 
         # Determine the architecture if not specified
         if args.arch is None:
@@ -57,46 +55,49 @@ class GStreamerInstanceSegmentationApp(GStreamerApp):
         if args.hef_path:
             self.hef_path = args.hef_path
         elif self.arch == "hailo8":
-            self.hef_path = os.path.join(self.current_path, '../resources/yolov5m_seg.hef')
+            self.hef_path = os.path.join(self.current_path, '../resources/b0_best_mIoU_iter_212000_opset15_sim_480_848.hef')
         else:  # hailo8l
+            # error
+            assert False, "Unsupported architecture"
             self.hef_path = os.path.join(self.current_path, '../resources/yolov5n_seg_h8l_mz.hef')
 
-        # self.default_post_process_so = os.path.join(self.postprocess_dir, 'libyolov5seg_post.so')
-        if 'yolov5m_seg' in self.hef_path:
-            self.config_file = os.path.join(self.current_path, '../resources/yolov5m_seg.json')
-        elif 'yolov5n_seg' in self.hef_path:
-            self.config_file = os.path.join(self.current_path, '../resources/yolov5n_seg.json')
-        else:
-            raise ValueError("HEF version not supported, you will need to provide a config file")
+        # # self.default_post_process_so = os.path.join(self.postprocess_dir, 'libyolov5seg_post.so')
+        # if 'yolov5m_seg' in self.hef_path:
+        #     self.config_file = os.path.join(self.current_path, '../resources/yolov5m_seg.json')
+        # elif 'yolov5n_seg' in self.hef_path:
+        #     self.config_file = os.path.join(self.current_path, '../resources/yolov5n_seg.json')
+        # else:
+        #     raise ValueError("HEF version not supported, you will need to provide a config file")
+
         self.default_post_process_so = os.path.join(self.current_path, '../resources/libyolov5seg_postprocess.so')
-        self.post_function_name = "filter_letterbox"
+        self.default_post_process_so = os.path.join(self.postprocess_dir, 'libsemantic_segmentation.so')
+        self.post_function_name = "filter"
         self.app_callback = app_callback
 
         # Set the process title
-        setproctitle.setproctitle("Hailo Instance Segmentation App")
+        setproctitle.setproctitle("Hailo Semantic Segmentation App")
 
         self.create_pipeline()
 
     def get_pipeline_string(self):
-        source_pipeline = SOURCE_PIPELINE(video_source=self.video_source, video_width=self.video_width, video_height=self.video_height)
+        source_pipeline = SOURCE_PIPELINE(video_source=self.video_source)
         infer_pipeline = INFERENCE_PIPELINE(
             hef_path=self.hef_path,
             post_process_so=self.default_post_process_so,
             post_function_name=self.post_function_name,
             batch_size=self.batch_size,
-            config_json=self.config_file,
+            config_json=None #self.config_file,
         )
-        infer_pipeline_wrapper = INFERENCE_PIPELINE_WRAPPER(infer_pipeline)
-        tracker_pipeline = TRACKER_PIPELINE(class_id=1)
         user_callback_pipeline = USER_CALLBACK_PIPELINE()
         display_pipeline = DISPLAY_PIPELINE(video_sink=self.video_sink, sync=self.sync, show_fps=self.show_fps)
         pipeline_string = (
             f'{source_pipeline} '
-            f'{infer_pipeline_wrapper} ! '
-            f'{tracker_pipeline} ! '
+            f'{infer_pipeline} ! '
+            'videoconvert ! video/x-raw, format=RGB ! '
             f'{user_callback_pipeline} ! '
             f'{display_pipeline}'
         )
+
         print(pipeline_string)
         return pipeline_string
 

@@ -360,6 +360,39 @@ def USER_CALLBACK_PIPELINE(name='identity_callback'):
     )
 
     return user_callback_pipeline
+
+def TRACKER_PIPELINE(class_id, kalman_dist_thr=0.8, iou_thr=0.9, init_iou_thr=0.7, keep_new_frames=2, keep_tracked_frames=15, keep_lost_frames=2, keep_past_metadata=False, qos=False, name='hailo_tracker'):
+    """
+    Creates a GStreamer pipeline string for the HailoTracker element.
+
+    Args:
+        class_id (int): The class ID to track. Default is -1, which tracks across all classes.
+        kalman_dist_thr (float, optional): Threshold used in Kalman filter to compare Mahalanobis cost matrix. Closer to 1.0 is looser. Defaults to 0.8.
+        iou_thr (float, optional): Threshold used in Kalman filter to compare IOU cost matrix. Closer to 1.0 is looser. Defaults to 0.9.
+        init_iou_thr (float, optional): Threshold used in Kalman filter to compare IOU cost matrix of newly found instances. Closer to 1.0 is looser. Defaults to 0.7.
+        keep_new_frames (int, optional): Number of frames to keep without a successful match before a 'new' instance is removed from the tracking record. Defaults to 2.
+        keep_tracked_frames (int, optional): Number of frames to keep without a successful match before a 'tracked' instance is considered 'lost'. Defaults to 15.
+        keep_lost_frames (int, optional): Number of frames to keep without a successful match before a 'lost' instance is removed from the tracking record. Defaults to 2.
+        keep_past_metadata (bool, optional): Whether to keep past metadata on tracked objects. Defaults to False.
+        qos (bool, optional): Whether to enable QoS. Defaults to False.
+        name (str, optional): The prefix name for the pipeline elements. Defaults to 'hailo_tracker'.
+
+    Note:
+        For a full list of options and their descriptions, run `gst-inspect-1.0 hailotracker`.
+
+    Returns:
+        str: A string representing the GStreamer pipeline for the HailoTracker element.
+    """
+    # Construct the tracker pipeline string
+    tracker_pipeline = (
+        f'hailotracker name={name} class-id={class_id} kalman-dist-thr={kalman_dist_thr} iou-thr={iou_thr} init-iou-thr={init_iou_thr} '
+        f'keep-new-frames={keep_new_frames} keep-tracked-frames={keep_tracked_frames} keep-lost-frames={keep_lost_frames} keep-past-metadata={keep_past_metadata} qos={qos} ! '
+        f'{QUEUE(name=f"{name}_q")} '
+    )
+
+    return tracker_pipeline
+
+
 # -----------------------------------------------------------------------------------------------
 # GStreamerApp class
 # -----------------------------------------------------------------------------------------------
