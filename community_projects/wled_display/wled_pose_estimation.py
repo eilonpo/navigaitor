@@ -13,7 +13,7 @@ from hailo_rpi_common import (
     get_numpy_from_buffer,
     app_callback_class,
 )
-from instance_segmentation_pipeline import GStreamerInstanceSegmentationApp
+from pose_estimation_pipeline import GStreamerPoseEstimationApp
 
 from wled_display import WLEDDisplay
 
@@ -24,7 +24,7 @@ from wled_display import WLEDDisplay
 class user_app_callback_class(app_callback_class):
     def __init__(self):
         super().__init__()
-        self.wled = WLEDDisplay(panels=3, udp_enabled=True)
+        self.wled = WLEDDisplay(panels=2, udp_enabled=True)
         self.frame_skip = 2  # Process every 2nd frame
 
 # Predefined colors (BGR format)
@@ -40,6 +40,27 @@ COLORS = [
     (0, 128, 128),  # Teal
     (128, 128, 0)   # Olive
 ]
+
+# Keypoints for pose estimation (example indices, adjust based on your model)
+keypoints = {
+    'nose': 0,
+    'left_eye': 1,
+    'right_eye': 2,
+    'left_ear': 3,
+    'right_ear': 4,
+    'left_shoulder': 5,
+    'right_shoulder': 6,
+    'left_elbow': 7,
+    'right_elbow': 8,
+    'left_wrist': 9,
+    'right_wrist': 10,
+    'left_hip': 11,
+    'right_hip': 12,
+    'left_knee': 13,
+    'right_knee': 14,
+    'left_ankle': 15,
+    'right_ankle': 16
+}
 
 # -----------------------------------------------------------------------------------------------
 # User-defined callback function
@@ -61,15 +82,15 @@ def app_callback(pad, info, user_data):
     if buffer is None:
         return Gst.PadProbeReturn.OK
 
-
     # Get the caps from the pad
     format, width, height = get_caps_from_pad(pad)
-    frame = np.zeros((height, width, 3), dtype=np.uint8)
 
     # Reduce the resolution by a factor of 4
     reduced_width = width // 4
     reduced_height = height // 4
-    reduced_frame = cv2.resize(frame, (reduced_width, reduced_height), interpolation=cv2.INTER_LINEAR)
+
+    # Generate a zero-filled numpy array for the reduced frame
+    reduced_frame = np.zeros((reduced_height, reduced_width, 3), dtype=np.uint8)
 
     # Get the detections from the buffer
     roi = hailo.get_roi_from_buffer(buffer)
@@ -88,40 +109,22 @@ def app_callback(pad, info, user_data):
             if len(track) == 1:
                 track_id = track[0].get_id()
 
-            # Instance segmentation mask from detection (if available)
-            masks = detection.get_objects_typed(hailo.HAILO_CONF_CLASS_MASK)
-            if len(masks) != 0:
-                mask = masks[0]
-                # Note that the mask is a 1D array, you need to reshape it to get the original shape
-                mask_height = mask.get_height()
-                mask_width = mask.get_width()
-                data = np.array(mask.get_data())
-                data = data.reshape((mask_height, mask_width))
-                # Resize the mask to the ROI size
-                roi_width = int(bbox.width() * reduced_width)
-                roi_height = int(bbox.height() * reduced_height)
-                resized_mask_data = cv2.resize(data, (roi_width, roi_height), interpolation=cv2.INTER_LINEAR)
+            # Pose estimation landmarks from detection (if available)
+            landmarks = detection.get_objects_typed(hailo.HAILO_LANDMARKS)
+            if len(landmarks) != 0:
+                points = landmarks[0].get_points()
+                for wrist in ['left_wrist', 'right_wrist']:
+                    keypoint_index = keypoints[wrist]
+                    point = points[keypoint_index]
+                    x = int((point.x() * bbox.width() + bbox.xmin()) * reduced_width)
+                    y = int((point.y() * bbox.height() + bbox.ymin()) * reduced_height)
+                    string_to_print += f"{wrist}: x: {x:.2f} y: {y:.2f}\n"
+                    color = COLORS[track_id % len(COLORS)]  # Get color based on track_id
+                    cv2.circle(reduced_frame, (x, y), 10, color, -1)
 
-                # Calculate the ROI coordinates
-                x_min, y_min = int(bbox.xmin() * reduced_width), int(bbox.ymin() * reduced_height)
-                x_max, y_max = x_min + roi_width, y_min + roi_height
-
-                # Ensure the ROI dimensions match the resized mask dimensions
-                if y_max > reduced_frame.shape[0]:
-                    y_max = reduced_frame.shape[0]
-                if x_max > reduced_frame.shape[1]:
-                    x_max = reduced_frame.shape[1]
-
-                # Add mask overlay to the frame
-                mask_overlay = np.zeros_like(reduced_frame)
-                color = COLORS[track_id % len(COLORS)]  # Get color based on track_id
-                mask_overlay[y_min:y_max, x_min:x_max] = np.dstack([(resized_mask_data[:y_max-y_min, :x_max-x_min] > 0.5) * c for c in color])
-                reduced_frame = cv2.addWeighted(reduced_frame, 1, mask_overlay, 0.5, 0)
-
-    # Resize the frame back to the original size for display
-    frame = cv2.resize(reduced_frame, (width, height), interpolation=cv2.INTER_LINEAR)
-    frame = cv2.resize(frame, (user_data.wled.panel_width * user_data.wled.panels, user_data.wled.panel_height))
-    user_data.wled.frame_queue.put(frame)
+    # Resize the frame to the WLED panel size for display
+    final_frame = cv2.resize(reduced_frame, (user_data.wled.panel_width * user_data.wled.panels, user_data.wled.panel_height))
+    user_data.wled.frame_queue.put(final_frame)
 
     print(string_to_print)
     return Gst.PadProbeReturn.OK
@@ -129,5 +132,5 @@ def app_callback(pad, info, user_data):
 if __name__ == "__main__":
     # Create an instance of the user app callback class
     user_data = user_app_callback_class()
-    app = GStreamerInstanceSegmentationApp(app_callback, user_data)
+    app = GStreamerPoseEstimationApp(app_callback, user_data)
     app.run()

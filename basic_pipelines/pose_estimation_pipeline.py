@@ -16,6 +16,7 @@ from hailo_rpi_common import (
     INFERENCE_PIPELINE,
     INFERENCE_PIPELINE_WRAPPER,
     USER_CALLBACK_PIPELINE,
+    TRACKER_PIPELINE,
     DISPLAY_PIPELINE,
     GStreamerApp,
     app_callback_class,
@@ -83,10 +84,13 @@ class GStreamerPoseEstimationApp(GStreamerApp):
         )
         user_callback_pipeline = USER_CALLBACK_PIPELINE()
         infer_pipeline_wrapper = INFERENCE_PIPELINE_WRAPPER(infer_pipeline)
+        tracker_pipeline = TRACKER_PIPELINE(class_id=0)
+        user_callback_pipeline = USER_CALLBACK_PIPELINE()
         display_pipeline = DISPLAY_PIPELINE(video_sink=self.video_sink, sync=self.sync, show_fps=self.show_fps)
         pipeline_string = (
             f'{source_pipeline} '
             f'{infer_pipeline_wrapper} ! '
+            f'{tracker_pipeline} ! '
             f'{user_callback_pipeline} ! '
             f'{display_pipeline}'
         )

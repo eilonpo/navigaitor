@@ -14,7 +14,7 @@ class WLEDDisplay:
         port=21324,
         panel_width=20,
         panel_height=20,
-        panels=3,
+        panels=2,
         udp_enabled=True,
     ):
         self.ip = ip
@@ -27,9 +27,16 @@ class WLEDDisplay:
         self.num_leds = self.num_leds_per_panel * panels
         self.frame_queue = Queue()
 
-        # Initialize UDP socket
+        # Initialize UDP socket with mDNS support
         if self.udp_enabled:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self.sock.settimeout(2)
+                self.sock.sendto(b'', (self.ip, self.port))  # Test connection
+            except (socket.gaierror, socket.timeout):
+                print(f"Unable to reach {self.ip}. Disabling UDP.")
+                self.sock = None
+                self.udp_enabled = False
         else:
             self.sock = None
 
@@ -83,7 +90,7 @@ class WLEDDisplay:
                 data.append(((start + start_led) >> 8) & 0xFF)
                 data.append((start + start_led) & 0xFF)
                 for color in chunk:
-                    data += bytearray([color[0], color[1], color[2]])
+                    data += bytearray([color[2], color[1], color[0]]) # Convert to RGB
                 chunks.append(data)
         return chunks
 
@@ -115,7 +122,7 @@ class WLEDDisplay:
         self.process.join()
 
 if __name__ == "__main__":
-    wled = WLEDDisplay(panels=3, udp_enabled=True)
+    wled = WLEDDisplay(panels=2, udp_enabled=True)
 
     frame_number = 0
     try:
