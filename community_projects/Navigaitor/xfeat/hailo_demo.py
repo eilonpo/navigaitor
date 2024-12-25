@@ -68,7 +68,7 @@ class ImageRecorder(threading.Thread):
         self.frame_grabber = frame_grabber
         self.storage_dir = storage_dir
         self.running = False
-        self.mode = "record"  # Modes: 'record' or 'playback'
+        self.mode = "playback"  # Modes: 'record' or 'playback'
         self.output_queue = []
         self.current_image_index = 0
 
@@ -335,21 +335,22 @@ class MatchingDemo:
         midx -= self.width
 
         area_threshold = 0.05
-        midx_threshold = 0.05
-
-        if ((1 - area_threshold) < abs(area / ref_area) < (1 + area_threshold)):
-            pass
-        elif area < ref_area:
-            print("Forward")
-        else:
-            print("Backward")
+        midx_threshold = 0.15
 
         if ((1 - midx_threshold) < abs(midx / ref_midx) < (1 + midx_threshold)):
-            pass
+            if ((1 - area_threshold) < abs(area / ref_area) < (1 + area_threshold)):
+                # Robot is in the right spot, next image
+                self.ref_frame = self.recorder.get_next_image()
+                self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
+            elif area < ref_area:
+                print("Forward")
+            else:
+                print("Backward")
         elif midx < ref_midx:
             print("Left")
         else:
             print("Right")
+
 
 
     def process(self):
@@ -357,7 +358,17 @@ class MatchingDemo:
         top_frame_canvas = self.create_top_frame()
 
         # Match features and draw matches on the bottom frame
+        i = 0
         bottom_frame = self.match_and_draw(self.ref_frame, self.current_frame)
+        while bottom_frame is None:
+            i += 1
+
+            if i == 5:
+                print("I give up :(")
+                return
+            self.ref_frame = self.recorder.get_next_image()
+            self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
+            bottom_frame = self.match_and_draw(self.ref_frame, self.current_frame)
         # Draw warped corners
         if self.H is not None and len(self.corners) > 1:
             self.print_directions(self.warp_points(self.corners, self.H, self.width), self.corners)
@@ -439,38 +450,43 @@ class MatchingDemo:
         self.putText(canvas=matched_frame, text="FPS (registration): {:.1f}".format(self.FPS), org=(self.width+10, 30), fontFace=self.font, 
             fontScale=self.font_scale, textColor=(0,0,0), borderColor=color, thickness=1, lineType=self.line_type)
 
+        if inliers.sum() < self.min_inliers:
+            return None
         return matched_frame
 
     def main_loop(self):
         self.current_frame = self.frame_grabber.get_last_frame()
-        self.ref_frame = self.current_frame.copy()
-        self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
+        # self.ref_frame = self.current_frame.copy()
+        # self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
+
+        self.ref_frame = self.recorder.get_next_image()
+        self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
 
         #record for 5 seconds
-        sleep(15)
+        # sleep(15)
         # self.recorder.switch_to_playback()
 
-        # while True:
-        #     if self.current_frame is None:
-        #         break
+        while True:
+            if self.current_frame is None:
+                break
 
-            # t0 = time()
-        #     self.process()
+            t0 = time.time()
+            self.process()
 
-        #     key = cv2.waitKey(1)
-        #     if key == ord('q'):
-        #         break
-        #     elif key == ord('s'):
-        #         self.ref_frame = self.current_frame.copy()  # Update reference frame
-        #         self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
+            key = cv2.waitKey(1)
+            if key == ord('q'):
+                break
+            # elif key == ord('s'):
+            #     self.ref_frame = self.current_frame.copy()  # Update reference frame
+            #     self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
 
-        #     self.current_frame = self.frame_grabber.get_last_frame()
+            self.current_frame = self.frame_grabber.get_last_frame()
 
-        #     #Measure avg. FPS
-        #     self.time_list.append(time()-t0)
-        #     if len(self.time_list) > self.max_cnt:
-        #         self.time_list.pop(0)
-        #     self.FPS = 1.0 / np.array(self.time_list).mean()
+            #Measure avg. FPS
+            self.time_list.append(time.time()-t0)
+            if len(self.time_list) > self.max_cnt:
+                self.time_list.pop(0)
+            self.FPS = 1.0 / np.array(self.time_list).mean()
         
         self.cleanup()
 
