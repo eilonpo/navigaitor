@@ -16,7 +16,7 @@ import threading
 import os
 from datetime import datetime
 from modules.xfeat import XFeat
-import server.external.McLumk_Wheel_Sports as mclumk
+# import server.external.McLumk_Wheel_Sports as mclumk
  
 
 def argparser():
@@ -110,10 +110,6 @@ class ImageRecorder(threading.Thread):
         """
         while self.mode == "record" and self.running:
             frame = self.frame_grabber.get_last_frame()
-            if frame is not None and len(b) < 50:
-                a, b = self.method.descriptor.detectAndCompute(frame, None)
-                time.sleep(0.01)
-
 
             if frame is not None:
                 timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S%f")
@@ -235,6 +231,8 @@ class MatchingDemo:
         self.min_inliers = 50
         self.ransac_thr = 4.0
 
+        self.win = False
+
         #FPS check
         self.FPS = 0
         self.time_list = []
@@ -348,21 +346,23 @@ class MatchingDemo:
             if ((1 - area_threshold) < abs(area / ref_area) < (1 + area_threshold)):
                 # Robot is in the right spot, next image
                 self.ref_frame = self.recorder.get_next_image()
+                if self.ref_frame is None:
+                    print("Reached destination")
+                    self.win = True
+                    return
                 self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
             elif area < ref_area:
-                mclumk.move_forward(speed_default)
+                # mclumk.move_forward(speed_default)
                 print("Forward")
             else:
-                mclumk.move_backward(speed_default)
+                # mclumk.move_backward(speed_default)
                 print("Backward")
         elif midx < ref_midx:
-            mclumk.move_left(speed_default)
+            # mclumk.move_left(speed_default)
             print("Left")
         else:
-            mclumk.move_right(speed_default)
+            # mclumk.move_right(speed_default)
             print("Right")
-
-
 
     def process(self):
         # Create a blank canvas for the top frame
@@ -371,15 +371,6 @@ class MatchingDemo:
         # Match features and draw matches on the bottom frame
         i = 0
         bottom_frame = self.match_and_draw(self.ref_frame, self.current_frame)
-        while bottom_frame is None:
-            i += 1
-
-            if i == 5:
-                print("I give up :(")
-                return
-            self.ref_frame = self.recorder.get_next_image()
-            self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
-            bottom_frame = self.match_and_draw(self.ref_frame, self.current_frame)
         # Draw warped corners
         if self.H is not None and len(self.corners) > 1:
             self.print_directions(self.warp_points(self.corners, self.H, self.width), self.corners)
@@ -470,13 +461,16 @@ class MatchingDemo:
     """main API functions: start_playback, start_recording, stop recording"""
     def start_playback(self):
         self.recorder.switch_to_playback()
-        while True:
+        self.ref_frame = self.recorder.get_next_image()
+        self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
+
+        while not self.win:
+            self.current_frame = self.frame_grabber.get_last_frame()
             if self.current_frame is None:
+                print("frame is none, bye")
                 break
 
             self.process()
-
-            self.current_frame = self.frame_grabber.get_last_frame()
             
         self.cleanup()
 
@@ -484,40 +478,45 @@ class MatchingDemo:
         self.recorder.switch_to_record()
         
     def stop_recording(self):
-        self.cleanup()
+        self.recorder.switch_to_playback()
+
         
     def main_loop(self):
-        self.current_frame = self.frame_grabber.get_last_frame()
-        # self.ref_frame = self.current_frame.copy()
-        # self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
+        self.start_recording()
+        # self.current_frame = self.frame_grabber.get_last_frame()
+        # # self.ref_frame = self.current_frame.copy()
+        # # self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
 
-        self.ref_frame = self.recorder.get_next_image()
-        self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
+        # self.ref_frame = self.recorder.get_next_image()
+        # self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
 
-        #record for 5 seconds
-        # sleep(15)
+        # #record for 5 seconds
+        sleep(5)
+        self.stop_recording()
 
-        while True:
-            if self.current_frame is None:
-                break
+        self.start_playback()
 
-            t0 = time.time()
-            self.process()
+        # while True:
+        #     if self.current_frame is None:
+        #         break
 
-            key = cv2.waitKey(1)
-            if key == ord('q'):
-                break
-            # elif key == ord('s'):
-            #     self.ref_frame = self.current_frame.copy()  # Update reference frame
-            #     self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
+        #     t0 = time.time()
+        #     self.process()
 
-            self.current_frame = self.frame_grabber.get_last_frame()
+        #     key = cv2.waitKey(1)
+        #     if key == ord('q'):
+        #         break
+        #     # elif key == ord('s'):
+        #     #     self.ref_frame = self.current_frame.copy()  # Update reference frame
+        #     #     self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
 
-            #Measure avg. FPS
-            self.time_list.append(time.time()-t0)
-            if len(self.time_list) > self.max_cnt:
-                self.time_list.pop(0)
-            self.FPS = 1.0 / np.array(self.time_list).mean()
+        #     self.current_frame = self.frame_grabber.get_last_frame()
+
+        #     #Measure avg. FPS
+        #     self.time_list.append(time.time()-t0)
+        #     if len(self.time_list) > self.max_cnt:
+        #         self.time_list.pop(0)
+        #     self.FPS = 1.0 / np.array(self.time_list).mean()
         
         self.cleanup()
 
