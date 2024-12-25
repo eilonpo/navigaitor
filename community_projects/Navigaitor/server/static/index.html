@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hailo robot can now repeat its tracks!</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        video {
+            max-width: 90%;
+            height: auto;
+            border: 2px solid #000;
+            border-radius: 8px;
+        }
+        .message {
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div>
+        <video id="video" controls autoplay></video>
+        <div class="message">
+            <p>If the video doesn't play, please ensure the stream is running and the URL is correct.</p>
+        </div>
+        <div id="keyPressDisplay">Waiting for key event...</div>
+    </div>
+    <script src="static/move_robot.js"></script>
+    <script src="static/stream.js"></script>
+
+</body>
+</html>
+
