@@ -10,9 +10,11 @@ import numpy as np
 import torch
 
 from time import time, sleep
+import time
 import argparse, sys
 import threading
-
+import os
+from datetime import datetime
 from modules.xfeat import XFeat
 
 def argparser():
@@ -105,9 +107,10 @@ class ImageRecorder(threading.Thread):
         Continuously capture and save images every 0.5 seconds in sequential order using the frame grabber.
         """
         while self.mode == "record" and self.running:
+            print("good")
             frame = self.frame_grabber.get_last_frame()
             if frame is not None:
-                timestamp = time.strftime("%Y%m%d_%H%M%S%f")
+                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S%f")
                 filename = os.path.join(self.storage_dir, f"image_{timestamp}.png")
                 cv2.imwrite(filename, frame)
                 print(f"Image saved: {filename}")
@@ -220,6 +223,7 @@ class MatchingDemo:
 
         #recorder
         self.recorder = ImageRecorder(frame_grabber=self.frame_grabber, storage_dir="recorded_images")
+        self.recorder.start()
 
         #Homography params
         self.min_inliers = 50
@@ -442,32 +446,36 @@ class MatchingDemo:
         self.ref_frame = self.current_frame.copy()
         self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
 
-        while True:
-            if self.current_frame is None:
-                break
+        #record for 5 seconds
+        sleep(15)
+        # self.recorder.switch_to_playback()
 
-            t0 = time()
-            self.process()
+        # while True:
+        #     if self.current_frame is None:
+        #         break
 
-            key = cv2.waitKey(1)
-            if key == ord('q'):
-                break
-            elif key == ord('s'):
-                self.ref_frame = self.current_frame.copy()  # Update reference frame
-                self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
+            # t0 = time()
+        #     self.process()
 
-            self.current_frame = self.frame_grabber.get_last_frame()
+        #     key = cv2.waitKey(1)
+        #     if key == ord('q'):
+        #         break
+        #     elif key == ord('s'):
+        #         self.ref_frame = self.current_frame.copy()  # Update reference frame
+        #         self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None) #Cache ref features
 
-            #Measure avg. FPS
-            self.time_list.append(time()-t0)
-            if len(self.time_list) > self.max_cnt:
-                self.time_list.pop(0)
-            self.FPS = 1.0 / np.array(self.time_list).mean()
+        #     self.current_frame = self.frame_grabber.get_last_frame()
+
+        #     #Measure avg. FPS
+        #     self.time_list.append(time()-t0)
+        #     if len(self.time_list) > self.max_cnt:
+        #         self.time_list.pop(0)
+        #     self.FPS = 1.0 / np.array(self.time_list).mean()
         
         self.cleanup()
 
     def cleanup(self):
-        self.frame_grabber.stop()
+        self.recorder.stop()
         self.frame_grabber.stop()
         self.cap.release()
         cv2.destroyAllWindows()
