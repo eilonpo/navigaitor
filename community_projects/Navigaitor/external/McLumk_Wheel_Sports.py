@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: UTF-8 -*-
-from Raspbot_Lib import Raspbot
+from external.Raspbot_Lib import Raspbot
 import time,math
 
 # 初始化机器人对象
