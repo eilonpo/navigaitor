@@ -459,6 +459,18 @@ class MatchingDemo:
         if bad_frame:
             return None
         return matched_frame
+    
+    def start_playback(self):
+        self.recorder.switch_to_playback()
+        while True:
+            if self.current_frame is None:
+                break
+
+            self.process()
+
+            self.current_frame = self.frame_grabber.get_last_frame()
+            
+        self.cleanup()
 
     def main_loop(self):
         self.current_frame = self.frame_grabber.get_last_frame()
