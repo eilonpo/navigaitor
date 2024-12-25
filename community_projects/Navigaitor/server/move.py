@@ -2,11 +2,15 @@ from server.external import McLumk_Wheel_Sports as bot
 
 DEFAULT_SPEED = 5
 
-def is_known_move(move_direction_request: str):
+def is_known_move(move_direction_request: str) -> bool:
     return move_direction_request in ["forward", "backward", "left", "right"]
 
-def move(command_received: dict):
-    command_key = list(command_received.keys())[0] 
+def move(command_received: dict) -> None:
+    command_received_keys = list(command_received.keys())
+    if len(command_received_keys) == 0:
+        return
+
+    command_key = command_received_keys[0] 
     if command_key == "released":
         bot.stop_robot()
         return
@@ -28,5 +32,5 @@ def move(command_received: dict):
     elif pressed_key == "left":
         bot.rotate_left(DEFAULT_SPEED)
 
-    elif pressed_key == "right":
+    else:
         bot.rotate_right(DEFAULT_SPEED)

@@ -14,8 +14,11 @@ def start():
     uvicorn.run("server.main:app", host="0.0.0.0", port=8000, reload=True)
 
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+
+
+# expecting: json in the format of `{"pressed" or "released": "forward" or "backward" or "left" or "right"}`
+@app.websocket("/move")
+async def move_robot(websocket: WebSocket):
     await websocket.accept()
     while True:
         data = await websocket.receive_text()
