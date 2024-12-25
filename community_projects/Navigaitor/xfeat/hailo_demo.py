@@ -16,6 +16,8 @@ import threading
 import os
 from datetime import datetime
 from modules.xfeat import XFeat
+import server.external.McLumk_Wheel_Sports as mclumk
+ 
 
 def argparser():
     parser = argparse.ArgumentParser(description="Configurations for the real-time matching demo.")
@@ -340,6 +342,7 @@ class MatchingDemo:
 
         area_threshold = 0.05
         midx_threshold = 0.15
+        speed_default = 5
 
         if ((1 - midx_threshold) < abs(midx / ref_midx) < (1 + midx_threshold)):
             if ((1 - area_threshold) < abs(area / ref_area) < (1 + area_threshold)):
@@ -347,12 +350,16 @@ class MatchingDemo:
                 self.ref_frame = self.recorder.get_next_image()
                 self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
             elif area < ref_area:
+                mclumk.move_forward(speed_default)
                 print("Forward")
             else:
+                mclumk.move_backward(speed_default)
                 print("Backward")
         elif midx < ref_midx:
+            mclumk.move_left(speed_default)
             print("Left")
         else:
+            mclumk.move_right(speed_default)
             print("Right")
 
 
@@ -460,6 +467,7 @@ class MatchingDemo:
             return None
         return matched_frame
     
+    """main API functions: start_playback, start_recording, stop recording"""
     def start_playback(self):
         self.recorder.switch_to_playback()
         while True:
@@ -472,6 +480,12 @@ class MatchingDemo:
             
         self.cleanup()
 
+    def start_recording(self):
+        self.recorder.switch_to_record()
+        
+    def stop_recording(self):
+        self.cleanup()
+        
     def main_loop(self):
         self.current_frame = self.frame_grabber.get_last_frame()
         # self.ref_frame = self.current_frame.copy()
