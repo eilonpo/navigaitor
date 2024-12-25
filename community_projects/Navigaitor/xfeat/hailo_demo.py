@@ -107,14 +107,18 @@ class ImageRecorder(threading.Thread):
         Continuously capture and save images every 0.5 seconds in sequential order using the frame grabber.
         """
         while self.mode == "record" and self.running:
-            print("good")
             frame = self.frame_grabber.get_last_frame()
+            if frame is not None and len(b) < 50:
+                a, b = self.method.descriptor.detectAndCompute(frame, None)
+                time.sleep(0.01)
+
+
             if frame is not None:
                 timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S%f")
                 filename = os.path.join(self.storage_dir, f"image_{timestamp}.png")
                 cv2.imwrite(filename, frame)
                 print(f"Image saved: {filename}")
-                time.sleep(0.5)
+                time.sleep(0.3)
             else:
                 print("No frame available from frame grabber.")
 
@@ -380,7 +384,8 @@ class MatchingDemo:
         cv2.imshow(self.window_name, canvas)
 
     def match_and_draw(self, ref_frame, current_frame):
-
+        bad_frame = False
+        bad_threshold = 60
         matches, good_matches = [], []
         kp1, kp2 = [], []
         points1, points2 = [], []
@@ -402,19 +407,19 @@ class MatchingDemo:
             points1 = kpts1[idx0].cpu().numpy()
             points2 = kpts2[idx1].cpu().numpy()
 
-        if len(kp1) > 10 and len(kp2) > 10 and self.args.method in ['SIFT', 'ORB']:
-            # Match descriptors
-            matches = self.method.matcher.match(des1, des2)
+        # if len(kp1) > 10 and len(kp2) > 10 and self.args.method in ['SIFT', 'ORB']:
+        #     # Match descriptors
+        #     matches = self.method.matcher.match(des1, des2)
 
-            if len(matches) > 10:
-                points1 = np.zeros((len(matches), 2), dtype=np.float32)
-                points2 = np.zeros((len(matches), 2), dtype=np.float32)
+        #     if len(matches) > 10:
+        #         points1 = np.zeros((len(matches), 2), dtype=np.float32)
+        #         points2 = np.zeros((len(matches), 2), dtype=np.float32)
 
-                for i, match in enumerate(matches):
-                    points1[i, :] = kp1[match.queryIdx].pt
-                    points2[i, :] = kp2[match.trainIdx].pt
+        #         for i, match in enumerate(matches):
+        #             points1[i, :] = kp1[match.queryIdx].pt
+        #             points2[i, :] = kp2[match.trainIdx].pt
 
-        if len(points1) > 10 and len(points2) > 10:
+        if len(points1) > bad_threshold and len(points2) > bad_threshold:
             # Find homography
             self.H, inliers = cv2.findHomography(points1, points2, cv2.USAC_MAGSAC, self.ransac_thr, maxIters=700, confidence=0.995)
             inliers = inliers.flatten() > 0
@@ -436,6 +441,7 @@ class MatchingDemo:
             
         else:
             matched_frame = np.hstack([ref_frame, current_frame])
+            bad_frame = True
 
         color = (240, 89, 169)
 
@@ -450,7 +456,7 @@ class MatchingDemo:
         self.putText(canvas=matched_frame, text="FPS (registration): {:.1f}".format(self.FPS), org=(self.width+10, 30), fontFace=self.font, 
             fontScale=self.font_scale, textColor=(0,0,0), borderColor=color, thickness=1, lineType=self.line_type)
 
-        if inliers.sum() < self.min_inliers:
+        if bad_frame:
             return None
         return matched_frame
 
@@ -464,7 +470,6 @@ class MatchingDemo:
 
         #record for 5 seconds
         # sleep(15)
-        # self.recorder.switch_to_playback()
 
         while True:
             if self.current_frame is None:
