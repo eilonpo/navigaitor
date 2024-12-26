@@ -355,8 +355,8 @@ class MatchingDemo:
         ref_area, ref_midx, ref_midy = self.get_area_mid(ref_points)
         midx -= self.width
 
-        area_threshold = 0.05
-        midx_threshold = 0.15
+        area_threshold = 0.3
+        midx_threshold = 5
         speed_default = 5
 
         if ((1 - midx_threshold) < abs(midx / ref_midx) < (1 + midx_threshold)):
@@ -456,7 +456,6 @@ class MatchingDemo:
             
         else:
             matched_frame = np.hstack([ref_frame, current_frame])
-            bad_frame = True
 
         color = (240, 89, 169)
 

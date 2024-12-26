@@ -1,3 +1,6 @@
+import sys
+sys.path.append("/usr/lib/python3/dist-packages")
+
 import onnxruntime as ort
 from hailo_platform import (HEF, VDevice, HailoStreamInterface, InferVStreams, ConfigureParams,
     InputVStreamParams, OutputVStreamParams, InputVStreams, OutputVStreams, FormatType)

@@ -175,7 +175,7 @@ class XFeat(nn.Module):
 		self.sum = self.sum + end-start
 		# print(self.sum)
 		# print(self.frames_num)
-		print("post process ",self.sum/self.frames_num)
+		#print("post process ",self.sum/self.frames_num)
 		return [  
 				   {'keypoints': mkpts[b][valid[b]],
 					'scores': scores[b][valid[b]],
