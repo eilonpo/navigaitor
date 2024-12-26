@@ -42,6 +42,16 @@ class FrameGrabber(threading.Thread):
         self.running = False
         self.width = width
         self.height = height
+        self.fps = int(self.cap.get(cv2.CAP_PROP_FPS)) or 30
+        self.fourcc = cv2.VideoWriter_fourcc(*"X264")
+        self.hls_directory = "./test"
+        self.gst_hls_pipeline = (
+            f"appsrc ! "
+            f"videoconvert ! "
+            f"x264enc tune=zerolatency bitrate=500 speed-preset=superfast ! "
+            f"mpegtsmux ! "
+            f"hlssink location={self.hls_directory}/segment_%05d.ts playlist-location={self.hls_directory}/playlist.m3u8 target-duration=5 max-files=5"
+        )
 
     def run(self):
         self.running = True
@@ -51,7 +61,7 @@ class FrameGrabber(threading.Thread):
                 print("Can't receive frame (stream ended?).")
             if (frame is None) or (self.frame is None):
                 print("BADDDDD")
-    
+            cv2.VideoWriter(self.gst_hls_pipeline, self.fourcc, self.fps, (self.width, self.height))
             self.frame = frame
             sleep(0.05)
 
