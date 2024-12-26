@@ -5,12 +5,37 @@ import logging
 import uvicorn
 import json
 from server.move import move
+from hailo_demo import MatchingDemo
 
 # Initialize the FastAPI app
 app = FastAPI()
+matching_demo_obj = MatchingDemo()
 
 # Set up logging (optional, for debugging)
 logging.basicConfig(level=logging.INFO)
+
+@app.post("/call_function_start_record")
+async def call_function_start_record():
+    print("call_function_start_record: Button was pressed!")
+    matching_demo_obj.start_recording()
+
+@app.post("/call_function_stop_record")
+async def call_function_stop_record():
+    print("call_function_stop_record: Button was pressed!")
+    matching_demo_obj.stop_recording()
+
+@app.post("/call_function_repeat_course")
+async def call_function_repeat_course():
+    print("call_function_repeat_course: Button was pressed!")
+    # add parameter
+    matching_demo_obj.start_playback()
+
+@app.post("/call_function_retract_home")
+async def call_function_retract_home():
+    print("call_function_retract_home: Button was pressed!")
+    # add parameter
+    matching_demo_obj.start_playback()
+
 
 # expecting: json in the format of `{"pressed" or "released": "forward" or "backward" or "left" or "right"}`
 @app.websocket("/move")
