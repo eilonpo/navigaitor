@@ -345,8 +345,8 @@ class MatchingDemo:
         ref_area, ref_midx, ref_midy = self.get_area_mid(ref_points)
         midx -= self.width
 
-        area_threshold = 0.05
-        midx_threshold = 0.15
+        area_threshold = 0.22
+        midx_threshold = 0.5
         speed_default = 5
 
         if ((1 - midx_threshold) < abs(midx / ref_midx) < (1 + midx_threshold)):
@@ -360,16 +360,23 @@ class MatchingDemo:
                 self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
             elif area < ref_area:
                 mclumk.move_forward(speed_default)
+                sleep(1)
                 print("Forward")
             else:
                 mclumk.move_backward(speed_default)
+                sleep(1)
                 print("Backward")
         elif midx < ref_midx:
-            mclumk.rotate_left(speed_default)
+            mclumk.rotate_left(3)
+            sleep(0.5)
             print("Left")
         else:
-            mclumk.rotate_right(speed_default)
+            mclumk.rotate_right(3)
+            sleep(0.5)
             print("Right")
+
+        
+        mclumk.stop_robot()
 
     def process(self):
         # Create a blank canvas for the top frame
@@ -382,6 +389,9 @@ class MatchingDemo:
         if self.H is not None and len(self.corners) > 1:
             self.print_directions(self.warp_points(self.corners, self.H, self.width), self.corners)
             self.draw_quad(top_frame_canvas, self.warp_points(self.corners, self.H, self.width))
+        else:
+            mclumk.stop_robot()
+            print("No box!!!!")
 
         # Stack top and bottom frames vertically on the final canvas
         canvas = np.vstack((top_frame_canvas, bottom_frame))
@@ -489,6 +499,7 @@ class MatchingDemo:
 
         
     def main_loop(self):
+        mclumk.stop_robot()
         self.start_recording()
         # self.current_frame = self.frame_grabber.get_last_frame()
         # # self.ref_frame = self.current_frame.copy()
@@ -533,9 +544,7 @@ class MatchingDemo:
         self.frame_grabber.stop()
         self.cap.release()
         cv2.destroyAllWindows()
-        mclumk.stop_robot()
 
 if __name__ == "__main__":
-    mclumk.stop_robot()
     demo = MatchingDemo(args = argparser())
     demo.main_loop()
