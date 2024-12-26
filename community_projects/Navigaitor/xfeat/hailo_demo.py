@@ -365,10 +365,10 @@ class MatchingDemo:
                 mclumk.move_backward(speed_default)
                 print("Backward")
         elif midx < ref_midx:
-            mclumk.move_left(speed_default)
+            mclumk.rotate_left(speed_default)
             print("Left")
         else:
-            mclumk.move_right(speed_default)
+            mclumk.rotate_right(speed_default)
             print("Right")
 
     def process(self):
@@ -533,7 +533,9 @@ class MatchingDemo:
         self.frame_grabber.stop()
         self.cap.release()
         cv2.destroyAllWindows()
+        mclumk.stop_robot()
 
 if __name__ == "__main__":
+    mclumk.stop_robot()
     demo = MatchingDemo(args = argparser())
     demo.main_loop()
