@@ -8,11 +8,9 @@ import subprocess
 import sys
 sys.path.append("/home/pi/navigaitor/community_projects/Navigaitor/xfeat")
 from server.move import move
-from hailo_demo import MatchingDemo
 
 # Initialize the FastAPI app
 app = FastAPI()
-matching_demo_obj = MatchingDemo()
 
 # Set up logging (optional, for debugging)
 logging.basicConfig(level=logging.INFO)

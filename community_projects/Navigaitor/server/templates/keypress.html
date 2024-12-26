@@ -69,10 +69,7 @@
 </head>
 <body>
 
-    <h1>Press or Release Any Key</h1>
-    <p>Press or release any key on your keyboard to see it displayed below.</p>
-
-    <div id="keyPressDisplay">Waiting for key event...</div>
+    <h1>Press or Release Any Arrow to move the robot</h1>
 
     <script>
         // Establish WebSocket connection to the FastAPI WebSocket endpoint
@@ -99,6 +96,8 @@
                     socket.send(`{"released" : "${event.key}"}`);
             });
 
+    </script>
+
         <p>
 
         <!-- Start Recording button -->
@@ -114,8 +113,6 @@
         <button onclick="callFunctionRetractToHome()">Retract to home</button>
 
         </p>
-    </script>
-
 </body>
 </html>
 
