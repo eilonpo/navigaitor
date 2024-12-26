@@ -31,8 +31,8 @@ def argparser():
     parser.add_argument('--cam', type=int, default=0, help='Webcam device number.')
     parser.add_argument('--video', type=str, default="", help='video path.')
     parser.add_argument('--inference_type', type=str, default='hailo', help='"hailo" or torch or onnx')
-    parser.add_argument('--record', type=bool, default=False)
-    parser.add_argument('--retreat', type=bool, default=False)
+    parser.add_argument('--record', action="store_true")
+    parser.add_argument('--retreat', action="store_true")
     return parser.parse_args()
 
 
