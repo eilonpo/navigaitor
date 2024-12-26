@@ -4,6 +4,9 @@ from starlette.requests import Request
 import logging
 import uvicorn
 import json
+import subprocess
+import sys
+sys.path.append("/home/pi/navigaitor/community_projects/Navigaitor/xfeat")
 from server.move import move
 from hailo_demo import MatchingDemo
 
@@ -13,16 +16,18 @@ matching_demo_obj = MatchingDemo()
 
 # Set up logging (optional, for debugging)
 logging.basicConfig(level=logging.INFO)
-
+record_pid = 0 ;
 @app.post("/call_function_start_record")
 async def call_function_start_record():
     print("call_function_start_record: Button was pressed!")
-    matching_demo_obj.start_recording()
+ 
+    venv_python = '/home/pi/navigaitor/venv_hailo_rpi5_examples/bin/python'
+    script_path = 'hailo_demo.py --record'
+    record_pid = subprocess.run([venv_python, script_path], capture_output=True, text=True)
 
 @app.post("/call_function_stop_record")
 async def call_function_stop_record():
-    print("call_function_stop_record: Button was pressed!")
-    matching_demo_obj.stop_recording()
+    record_pid.kill()
 
 @app.post("/call_function_repeat_course")
 async def call_function_repeat_course():
@@ -30,9 +35,9 @@ async def call_function_repeat_course():
     # add parameter
     matching_demo_obj.start_playback()
 
-@app.post("/call_function_retract_home")
-async def call_function_retract_home():
-    print("call_function_retract_home: Button was pressed!")
+@app.post("/call_function_retreat_home")
+async def call_function_retreat_home():
+    print("call_function_retreat_home: Button was pressed!")
     # add parameter
     matching_demo_obj.start_playback()
 
