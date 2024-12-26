@@ -16,7 +16,10 @@ import threading
 import os
 from datetime import datetime
 from modules.xfeat import XFeat
-# import server.external.McLumk_Wheel_Sports as mclumk
+
+import sys
+sys.path.append("/home/pi/navigaitor/community_projects/Navigaitor/server/external")
+import McLumk_Wheel_Sports as mclumk
  
 
 def argparser():
@@ -46,8 +49,11 @@ class FrameGrabber(threading.Thread):
             ret, frame = self.cap.read()
             if not ret:
                 print("Can't receive frame (stream ended?).")
+            if (frame is None) or (self.frame is None):
+                print("BADDDDD")
+    
             self.frame = frame
-            sleep(0.01)
+            sleep(0.05)
 
     def stop(self):
         self.running = False
@@ -129,13 +135,14 @@ class ImageRecorder(threading.Thread):
         """
         if self.mode == "playback":
             image_files = sorted(os.listdir(self.storage_dir))
+            print(len(image_files),"images found")
             if self.current_image_index < len(image_files):
                 image_file = image_files[self.current_image_index]
                 image_path = os.path.join(self.storage_dir, image_file)
                 frame = cv2.imread(image_path)
                 if frame is not None:
                     self.current_image_index += 1
-                    print(f"Sent image: {image_file}")
+                    print(f"Sent image: {image_path}")
                     return frame
                 else:
                     print(f"Failed to load image: {image_path}")
@@ -352,16 +359,16 @@ class MatchingDemo:
                     return
                 self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
             elif area < ref_area:
-                # mclumk.move_forward(speed_default)
+                mclumk.move_forward(speed_default)
                 print("Forward")
             else:
-                # mclumk.move_backward(speed_default)
+                mclumk.move_backward(speed_default)
                 print("Backward")
         elif midx < ref_midx:
-            # mclumk.move_left(speed_default)
+            mclumk.move_left(speed_default)
             print("Left")
         else:
-            # mclumk.move_right(speed_default)
+            mclumk.move_right(speed_default)
             print("Right")
 
     def process(self):
@@ -491,9 +498,10 @@ class MatchingDemo:
         # self.ref_precomp = self.method.descriptor.detectAndCompute(self.ref_frame, None)
 
         # #record for 5 seconds
-        sleep(5)
+        sleep(10)
         self.stop_recording()
-
+        print("STOPPED RECORDING, MOVING TO PLAYBACK")
+        sleep(5)
         self.start_playback()
 
         # while True:
